@@ -395,7 +395,14 @@ function render(){
   const open=STATE.tasks.filter(t=>!t.done);
   const auto=(STATE.activity||[]).filter(a=>a.kind==='calendar'||a.kind==='task').length;
   animCount($('#kEvents'),todays.length);animCount($('#kTasks'),open.length);animCount($('#kAuto'),auto);
-  $('#agenda').innerHTML=todays.length?todays.map(e=>`<div class="it"><div class="time">${fmtTime(e.start)}</div><div><div class="t">${esc(e.title)}</div>${e.source?`<div class="s">${esc(e.source)}</div>`:''}</div></div>`).join(''):`<div class="empty">Nothing today. Ask Juno to add something.</div>`;
+  const upcomingAll=[...STATE.events].sort((a,b)=>new Date(a.start)-new Date(b.start)).filter(e=>new Date(e.start)>=new Date(Date.now()-36e5));
+  if(todays.length){
+    $('#agenda').innerHTML=todays.map(e=>`<div class="it"><div class="time">${fmtTime(e.start)}</div><div><div class="t">${esc(e.title)}</div>${e.source?`<div class="s">${esc(e.source)}</div>`:''}</div></div>`).join('');
+  } else if(upcomingAll.length){
+    $('#agenda').innerHTML=`<div class="s" style="margin-bottom:8px;color:var(--mute)">Nothing today — coming up:</div>`+upcomingAll.slice(0,5).map(e=>`<div class="it"><div class="time">${fmtDay(e.start)}<br><span style="color:var(--mute)">${fmtTime(e.start)}</span></div><div><div class="t">${esc(e.title)}</div>${e.source?`<div class="s">${esc(e.source)}</div>`:''}</div></div>`).join('');
+  } else {
+    $('#agenda').innerHTML=`<div class="empty">Nothing scheduled yet. Ask Juno to add something.</div>`;
+  }
   $('#feed').innerHTML=(STATE.activity||[]).length?STATE.activity.slice(0,8).map(a=>`<div class="it"><span class="ic">${({calendar:'📅',task:'✅',email:'✉️',slack:'💬',notion:'📝'})[a.kind]||'✦'}</span><span class="t">${esc(a.text)}</span><span class="ago">${timeAgo(a.at)}</span></div>`).join(''):`<div class="empty">Juno's actions show up here.</div>`;
   $('#tlist').innerHTML=STATE.tasks.length?STATE.tasks.map(t=>`<div class="task ${t.done?'done':''}"><div class="check" onclick="toggleTask('${t.id}')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5"><path d="M5 13l4 4L19 7"/></svg></div><div><div class="tx">${esc(t.text)}</div>${t.source?`<div class="src">via ${esc(t.source)}</div>`:''}</div></div>`).join(''):`<div class="empty" style="margin-top:30px">No tasks yet. Add one or ask Juno.</div>`;
   const up=[...STATE.events].sort((a,b)=>new Date(a.start)-new Date(b.start)).filter(e=>new Date(e.start)>=new Date(Date.now()-36e5));
