@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://apis.google.com; img-src 'self' data: https:; media-src 'self' blob:; frame-src https://juno-e67eb.firebaseapp.com https://accounts.google.com https://apis.google.com; connect-src 'self' https://juno-api-35cp.onrender.com https://www.googleapis.com https://securetoken.googleapis.com https://identitytoolkit.googleapis.com">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://www.gstatic.com https://apis.google.com https://cdn.jsdelivr.net; img-src 'self' data: https:; media-src 'self' blob:; worker-src 'self' blob:; frame-src https://juno-e67eb.firebaseapp.com https://accounts.google.com https://apis.google.com; connect-src 'self' blob: data: https://juno-api-35cp.onrender.com https://www.googleapis.com https://securetoken.googleapis.com https://identitytoolkit.googleapis.com https://cdn.jsdelivr.net https://huggingface.co https://*.huggingface.co https://cdn-lfs.huggingface.co https://cdn-lfs-us-1.huggingface.co">
 <title>Juno</title>
 <style>
 :root{--bg:#070a12;--panel:rgba(255,255,255,.045);--panel2:rgba(255,255,255,.07);--line:rgba(255,255,255,.09);
@@ -306,6 +306,32 @@ window.FB = {
 window.dispatchEvent(new Event('fb-ready'));
 </script>
 
+<script type="module">
+// In-browser speech-to-text (Whisper via transformers.js) — no API key, runs locally.
+let asrPromise=null;
+async function getASR(){
+  if(!asrPromise){
+    const t=await import('https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2');
+    t.env.allowLocalModels=false; try{t.env.backends.onnx.wasm.numThreads=1;}catch{}
+    asrPromise=t.pipeline('automatic-speech-recognition','Xenova/whisper-tiny.en');
+  }
+  return asrPromise;
+}
+async function blobToPCM(blob){
+  const ab=await blob.arrayBuffer();
+  const ac=new (window.AudioContext||window.webkitAudioContext)();
+  const dec=await ac.decodeAudioData(ab);
+  const off=new OfflineAudioContext(1,Math.max(1,Math.ceil(dec.duration*16000)),16000);
+  const s=off.createBufferSource(); s.buffer=dec; s.connect(off.destination); s.start();
+  const r=await off.startRendering(); try{ac.close();}catch{}
+  return r.getChannelData(0);
+}
+window.STT={
+  warm:()=>{getASR().catch(()=>{});},
+  transcribe:async(blob)=>{ const asr=await getASR(); const audio=await blobToPCM(blob); const out=await asr(audio); return ((out&&out.text)||'').trim(); },
+};
+</script>
+
 <script>
 const API="https://juno-api-35cp.onrender.com";
 const $=s=>document.querySelector(s),$$=s=>document.querySelectorAll(s);
@@ -414,17 +440,29 @@ let synth=window.speechSynthesis,recog=null,recording=false;
 function toggleVoice(){voiceOn=!voiceOn;$('#voiceToggle').classList.toggle('on',voiceOn);$('#vIco').textContent=voiceOn?'🔊':'🔇';$('#vTxt').textContent=voiceOn?'Voice on':'Voice off';$('#ttsSw').classList.toggle('on',voiceOn);if(!voiceOn&&synth)synth.cancel();else toast('Juno will speak replies');}
 function pickVoice(){const vs=synth.getVoices();return vs.find(v=>/Samantha|Ava|Allison|Serena|Karen|Google US English/i.test(v.name))||vs.find(v=>v.lang==='en-US')||vs[0];}
 function speak(text){if(!voiceOn||!synth||!text)return;synth.cancel();const u=new SpeechSynthesisUtterance(text);const v=pickVoice();if(v)u.voice=v;u.rate=1.03;u.pitch=1.02;u.onstart=()=>$('#orb').classList.add('speak');u.onend=()=>$('#orb').classList.remove('speak');synth.speak(u);}
-function toggleMic(){
-  if(recording){if(recog)recog.stop();return;}
-  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-  if(!SR){toast('Speech input not available here — type instead. (I can still speak back.)');return;}
-  recog=new SR();recog.lang='en-US';recog.interimResults=true;recog.continuous=false;
-  let finalT='';
-  recog.onstart=()=>{recording=true;micUI(true);$('#orb').classList.add('listen');};
-  recog.onresult=e=>{let t='';for(let i=0;i<e.results.length;i++)t+=e.results[i][0].transcript;finalT=t;const box=$('#v-chat').classList.contains('on')?$('#chatInput'):$('#askInput');box.value=t;};
-  recog.onerror=ev=>{toast(ev.error==='not-allowed'?'Allow microphone access in System Settings → Privacy.':'Mic: '+ev.error);};
-  recog.onend=()=>{recording=false;micUI(false);$('#orb').classList.remove('listen');if(finalT.trim()){if($('#v-chat').classList.contains('on'))sendChat();else quickAsk();}};
-  try{recog.start();}catch(e){toast('Mic busy — try again');}
+// Voice input: record the mic, transcribe locally with in-browser Whisper (no key, works in Electron).
+let mediaRec=null,recChunks=[],micStream=null;
+async function toggleMic(){
+  if(recording){if(mediaRec&&mediaRec.state!=='inactive')mediaRec.stop();return;}
+  if(!window.STT){toast('Voice engine still loading, one sec…');return;}
+  try{micStream=await navigator.mediaDevices.getUserMedia({audio:true});}
+  catch(e){toast('Allow microphone access in System Settings → Privacy → Microphone, then try again.');return;}
+  recChunks=[];try{mediaRec=new MediaRecorder(micStream);}catch(e){toast('Recorder unavailable here.');return;}
+  mediaRec.ondataavailable=e=>{if(e.data&&e.data.size)recChunks.push(e.data);};
+  mediaRec.onstart=()=>{recording=true;micUI(true);$('#orb').classList.add('listen');window.STT.warm();};
+  mediaRec.onstop=async()=>{
+    recording=false;micUI(false);$('#orb').classList.remove('listen');
+    if(micStream){micStream.getTracks().forEach(t=>t.stop());micStream=null;}
+    if(!recChunks.length){return;}
+    const blob=new Blob(recChunks,{type:(recChunks[0]&&recChunks[0].type)||'audio/webm'});
+    toast(window._sttReady?'Transcribing…':'Loading voice model (first time, ~30s)…');
+    try{
+      const text=await window.STT.transcribe(blob);window._sttReady=true;
+      if(text){const box=$('#v-chat').classList.contains('on')?$('#chatInput'):$('#askInput');box.value=text;if($('#v-chat').classList.contains('on'))sendChat();else quickAsk();}
+      else toast('Did not catch that — try again.');
+    }catch(e){toast('Voice error: '+(e.message||e));}
+  };
+  mediaRec.start();
 }
 function micUI(on){$$('.mic').forEach(m=>m.classList.toggle('rec',on));}
 if(synth)synth.onvoiceschanged=pickVoice;
