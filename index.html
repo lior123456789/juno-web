@@ -311,6 +311,8 @@ const API="https://juno-api-35cp.onrender.com";
 const $=s=>document.querySelector(s),$$=s=>document.querySelectorAll(s);
 let STATE={user:{connections:{}},tasks:[],events:[],activity:[]};
 let mode='login', voiceOn=false;
+let TOKEN=localStorage.getItem('juno_token')||'';   // backend JWT (email/password path)
+let authMode=TOKEN?'backend':null;                   // 'backend' | 'firebase'
 if(!window.juno){window.juno={openExternal:(u)=>window.open(u,'_blank','noopener'),setAutoLaunch:async()=>{},onFocus:(fn)=>window.addEventListener('focus',fn)};}
 
 /* aurora */
@@ -318,8 +320,8 @@ if(!window.juno){window.juno={openExternal:(u)=>window.open(u,'_blank','noopener
 const blobs=[{x:.2,y:.3,r:.5,c:[109,92,255]},{x:.8,y:.2,r:.45,c:[25,195,255]},{x:.6,y:.85,r:.55,c:[255,92,168]},{x:.1,y:.9,r:.4,c:[80,107,255]}];let t=0;
 function f(){t+=.0024;x.clearRect(0,0,W,H);x.globalCompositeOperation='lighter';blobs.forEach((b,i)=>{const px=(b.x+Math.sin(t+i*1.7)*.07)*W,py=(b.y+Math.cos(t*1.1+i)*.07)*H,r=b.r*Math.min(W,H);const g=x.createRadialGradient(px,py,0,px,py,r);g.addColorStop(0,`rgba(${b.c[0]},${b.c[1]},${b.c[2]},.20)`);g.addColorStop(1,'rgba(0,0,0,0)');x.fillStyle=g;x.beginPath();x.arc(px,py,r,0,7);x.fill();});x.globalCompositeOperation='source-over';requestAnimationFrame(f);}f();})();
 
-/* api — bearer token comes from Firebase */
-async function getToken(){try{return (window.FB?await window.FB.token():'')||'';}catch{return '';}}
+/* api — bearer token from backend JWT (email/password) or Firebase (Google) */
+async function getToken(){if(authMode==='firebase'&&window.FB){try{return (await window.FB.token())||'';}catch{return '';}}return TOKEN;}
 async function api(path,opts={}){const tok=await getToken();const r=await fetch(API+path,{...opts,headers:{'content-type':'application/json',...(tok?{authorization:'Bearer '+tok}:{}),...(opts.headers||{})}});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||('HTTP '+r.status));return d;}
 
 /* auth — Firebase email/password + Google */
@@ -328,13 +330,13 @@ function fbErr(e){const m=String((e&&e.code)||(e&&e.message)||e);if(/invalid-cre
 async function doAuth(){
   const email=$('#lemail').value.trim(),password=$('#lpass').value;$('#lerr').textContent='';
   if(!email||!password)return $('#lerr').textContent='Enter your email and password.';
-  if(!window.FB)return $('#lerr').textContent='Still loading… try again in a second.';
   $('#lbtn').textContent='…';
-  try{ if(mode==='signup')await window.FB.signup(email,password); else await window.FB.login(email,password); /* onUser → enterApp */ }
-  catch(e){$('#lerr').textContent=fbErr(e);$('#lbtn').textContent=mode==='signup'?'Create account':'Log in';}
+  try{ const d=await api('/api/'+(mode==='signup'?'signup':'login'),{method:'POST',body:JSON.stringify({email,password})});
+    TOKEN=d.token;authMode='backend';localStorage.setItem('juno_token',TOKEN);enterApp(); }
+  catch(e){$('#lerr').textContent=e.message;$('#lbtn').textContent=mode==='signup'?'Create account':'Log in';}
 }
-async function googleLogin(){$('#lerr').textContent='';if(!window.FB)return;try{const at=await window.FB.google();if(at)window._googleAT=at;/* onUser → enterApp */}catch(e){$('#lerr').textContent=fbErr(e);}}
-async function logout(){try{await window.FB.logout();}catch{}window._entered=false;location.reload();}
+async function googleLogin(){$('#lerr').textContent='';if(!window.FB)return $('#lerr').textContent='Google is still loading… try again in a second.';try{const at=await window.FB.google();authMode='firebase';if(at)window._googleAT=at;enterApp();}catch(e){$('#lerr').textContent=fbErr(e);}}
+async function logout(){TOKEN='';authMode=null;localStorage.removeItem('juno_token');window._entered=false;try{if(window.FB)await window.FB.logout();}catch{}location.reload();}
 function enterApp(){
   if(window._entered)return;window._entered=true;
   $('#login').classList.add('hidden');$('#appwrap').classList.remove('hidden');setTimeout(()=>movePill(0),60);
@@ -445,8 +447,11 @@ async function refresh(){try{const d=await api('/api/me');STATE.user=d.user;STAT
 window.juno.onFocus(()=>{if(!$('#appwrap').classList.contains('hidden'))refresh();});
 
 /* boot — Firebase decides who's logged in */
-function startAuth(){window.FB.onUser(u=>{if(u){enterApp();}else{window._entered=false;$('#appwrap').classList.add('hidden');$('#login').classList.remove('hidden');}});}
+// Firebase (Google) session restore
+function startAuth(){if(!window.FB)return;window.FB.onUser(u=>{if(u){authMode='firebase';enterApp();}else if(authMode==='firebase'){window._entered=false;$('#appwrap').classList.add('hidden');$('#login').classList.remove('hidden');}});}
 if(window.FB)startAuth();else addEventListener('fb-ready',startAuth);
+// backend (email/password) session restore
+if(TOKEN){api('/api/me').then(()=>{authMode='backend';enterApp();}).catch(()=>{TOKEN='';localStorage.removeItem('juno_token');});}
 </script>
 </body>
 </html>
