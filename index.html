@@ -377,7 +377,7 @@ function enterApp(){
 /* nav */
 const order=['today','chat','tasks','calendar','integrations','settings'];
 function movePill(i){const p=$('#pill');p.style.transform=`translateY(${i*43}px)`;}
-function go(v){order.forEach(o=>$('#v-'+o).classList.toggle('on',o===v));$$('.nav').forEach(n=>n.classList.toggle('on',n.dataset.v===v));movePill(order.indexOf(v));if(v==='chat')setTimeout(()=>$('#chatInput').focus(),60);if(v==='integrations')loadIntegrations();}
+function go(v){order.forEach(o=>$('#v-'+o).classList.toggle('on',o===v));$$('.nav').forEach(n=>n.classList.toggle('on',n.dataset.v===v));movePill(order.indexOf(v));if(v==='chat')setTimeout(()=>$('#chatInput').focus(),60);if(v==='integrations')loadIntegrations();if(['today','calendar','tasks'].includes(v))refresh();}
 $$('.nav').forEach(n=>n.onclick=()=>go(n.dataset.v));
 (function(){const h=new Date().getHours();$('#greet').innerHTML=`Good <span class="g">${h<12?'morning':h<18?'afternoon':'evening'}</span>.`;})();
 
