@@ -348,7 +348,7 @@ function enterApp(){
 /* nav */
 const order=['today','chat','tasks','calendar','integrations','settings'];
 function movePill(i){const p=$('#pill');p.style.transform=`translateY(${i*43}px)`;}
-function go(v){order.forEach(o=>$('#v-'+o).classList.toggle('on',o===v));$$('.nav').forEach(n=>n.classList.toggle('on',n.dataset.v===v));movePill(order.indexOf(v));if(v==='chat')setTimeout(()=>$('#chatInput').focus(),60);if(v==='integrations')renderIntegrations();}
+function go(v){order.forEach(o=>$('#v-'+o).classList.toggle('on',o===v));$$('.nav').forEach(n=>n.classList.toggle('on',n.dataset.v===v));movePill(order.indexOf(v));if(v==='chat')setTimeout(()=>$('#chatInput').focus(),60);if(v==='integrations')loadIntegrations();}
 $$('.nav').forEach(n=>n.onclick=()=>go(n.dataset.v));
 (function(){const h=new Date().getHours();$('#greet').innerHTML=`Good <span class="g">${h<12?'morning':h<18?'afternoon':'evening'}</span>.`;})();
 
@@ -376,24 +376,21 @@ function render(){
   $('#acctEmail').textContent=STATE.user.email||'';$('#acctEmail2').textContent=STATE.user.email||'';
 }
 
-/* integrations */
-const INTS=[
-  {key:'gmail',ic:'✉️',bg:'linear-gradient(135deg,#ea4335,#ff7a6b)',h:'Gmail',p:'Send email + let people book you by emailing Juno.',action:()=>gmailModal()},
-  {key:'slack',ic:'💬',bg:'linear-gradient(135deg,#4a154b,#a25fa3)',h:'Slack',p:'Post messages to your workspace by voice or chat.',action:()=>oauth('slack')},
-  {key:'notion',ic:'📝',bg:'linear-gradient(135deg,#111,#555)',h:'Notion',p:'Turn requests into Notion pages & tasks.',action:()=>notionModal()},
-  {key:'google',ic:'🗓️',bg:'linear-gradient(135deg,#1a73e8,#7eb3ff)',h:'Google Calendar',p:'Two-way sync with your Google Calendar.',action:()=>oauth('google')},
-];
+/* integrations — catalog comes from the server, not hardcoded */
+let CATALOG=[];
+async function loadIntegrations(){try{const d=await api('/api/integrations');CATALOG=d.integrations||[];}catch{}renderIntegrations();}
 function renderIntegrations(){
-  const c=STATE.user.connections||{};
-  $('#intg').innerHTML=INTS.map(i=>{const on=!!c[i.key];return `<div class="int"><div class="ico" style="background:${i.bg}">${i.ic}</div><h3>${i.h}</h3><p>${i.p}</p><button class="cbtn ${on?'on':''}" onclick='${on?"":`INTS_action("${i.key}")`}'>${on?'● Connected':'Connect'}</button></div>`;}).join('');
+  if(!CATALOG.length){$('#intg').innerHTML='<div class="empty">Loading integrations…</div>';return;}
+  $('#intg').innerHTML=CATALOG.map(i=>{const on=i.connected,soon=!i.configured;return `<div class="int"><div class="ico" style="background:${i.bg}">${i.icon}</div><h3>${i.name}</h3><p>${i.desc}</p><button class="cbtn ${on?'on':soon?'soon':''}" ${on||soon?'disabled':''} onclick='intAction("${i.key}","${i.kind}")'>${on?'● Connected':soon?'Coming soon':'Connect'}</button></div>`;}).join('');
 }
-function INTS_action(k){const i=INTS.find(x=>x.key===k);if(i)i.action();}
+function intAction(key,kind){if(kind==='apppassword')gmailModal();else if(kind==='token')notionModal();else if(kind==='google')googleConnect();else if(kind==='oauth')oauth(key);}
+async function googleConnect(){if(!window.FB)return;toast('Opening Google…');try{const at=await window.FB.google();if(at){const d=await api('/api/connect/google-token',{method:'POST',body:JSON.stringify({accessToken:at})});STATE.user=d.user;loadIntegrations();render();toast('Google Calendar connected ✓');}}catch(e){toast('⚠️ '+fbErr(e));}}
 function gmailModal(){openModal(`<h3>Connect Gmail</h3><p>Use a Gmail app password (not your normal password). Turn on 2-Step Verification, then create one <a onclick="ext('https://myaccount.google.com/apppasswords')">here</a>. Juno can then send mail and read its inbox to schedule things.</p><input id="gu" placeholder="you@gmail.com"><input id="gp" type="password" placeholder="16-character app password"><div class="actions"><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn" onclick="connectGmail()">Connect</button></div>`);}
-async function connectGmail(){const user=$('#gu').value.trim(),pass=$('#gp').value.trim().replace(/\s/g,'');if(!user||!pass)return toast('Fill both fields');toast('Connecting…');try{const d=await api('/api/connect/gmail',{method:'POST',body:JSON.stringify({user,pass})});STATE.user=d.user;closeModal();renderIntegrations();render();toast('Gmail connected ✓');}catch(e){toast('⚠️ '+e.message);}}
+async function connectGmail(){const user=$('#gu').value.trim(),pass=$('#gp').value.trim().replace(/\s/g,'');if(!user||!pass)return toast('Fill both fields');toast('Connecting…');try{const d=await api('/api/connect/gmail',{method:'POST',body:JSON.stringify({user,pass})});STATE.user=d.user;closeModal();loadIntegrations();render();toast('Gmail connected ✓');}catch(e){toast('⚠️ '+e.message);}}
 function notionModal(){openModal(`<h3>Connect Notion</h3><p>Create an internal integration <a onclick="ext('https://www.notion.so/my-integrations')">here</a>, copy its token, and share a database with it. Paste the token below.</p><input id="nt" type="password" placeholder="secret_… (Notion integration token)"><div class="actions"><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn" onclick="connectNotion()">Connect</button></div>`);}
-async function connectNotion(){const token=$('#nt').value.trim();if(!token)return toast('Paste a token');toast('Connecting…');try{const d=await api('/api/connect/notion-token',{method:'POST',body:JSON.stringify({token})});STATE.user=d.user;closeModal();renderIntegrations();render();toast('Notion connected ✓');}catch(e){toast('⚠️ '+e.message);}}
+async function connectNotion(){const token=$('#nt').value.trim();if(!token)return toast('Paste a token');toast('Connecting…');try{const d=await api('/api/connect/notion-token',{method:'POST',body:JSON.stringify({token})});STATE.user=d.user;closeModal();loadIntegrations();render();toast('Notion connected ✓');}catch(e){toast('⚠️ '+e.message);}}
 async function oauth(prov){try{const d=await api('/api/oauth/'+prov+'/start');window.juno.openExternal(d.url);toast('Opening '+prov+' in your browser… come back when done.');pollConnect();}catch(e){toast(e.message.includes('configured')?prov+' isn\\'t switched on yet — almost there.':'⚠️ '+e.message);}}
-let pollT;function pollConnect(){clearInterval(pollT);let n=0;pollT=setInterval(async()=>{n++;await refresh();renderIntegrations();if(n>40)clearInterval(pollT);},3000);}
+let pollT;function pollConnect(){clearInterval(pollT);let n=0;pollT=setInterval(async()=>{n++;await refresh();loadIntegrations();if(n>40)clearInterval(pollT);},3000);}
 
 /* chat */
 let HIST=[];
