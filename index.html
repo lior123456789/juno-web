@@ -167,6 +167,17 @@ h1.h{font-size:26px;font-weight:820;letter-spacing:-.02em}.subt{color:var(--mute
 .attachchip{display:none;align-items:center;background:var(--panel2);border:1px solid var(--line);border-radius:11px;padding:9px 13px;font-size:13px;margin-bottom:9px;width:fit-content;max-width:100%;animation:pop .25s}
 .memit{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 13px;background:var(--panel);border:1px solid var(--line);border-radius:11px;margin-bottom:7px;font-size:13.5px;line-height:1.4}
 .memit .del{opacity:.55;flex-shrink:0}.memit:hover .del{opacity:1}
+.chat{position:relative}
+.chipbtn{background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:11px;padding:8px 12px;font-size:13px;font-weight:600;cursor:pointer;transition:.15s;white-space:nowrap}
+.chipbtn:hover{border-color:rgba(109,92,255,.5);transform:translateY(-1px)}
+.chatpanel{display:none;position:absolute;top:44px;left:2px;z-index:25;width:310px;max-height:360px;overflow-y:auto;background:#0d111d;border:1px solid var(--line);border-radius:14px;padding:7px;box-shadow:0 22px 55px rgba(0,0,0,.55)}
+.chatpanel.on{display:block;animation:pop .2s}
+.chatli{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 11px;border-radius:9px;cursor:pointer;font-size:13.5px;color:var(--mute)}
+.chatli:hover{background:var(--panel2);color:#fff}.chatli.on{background:rgba(109,92,255,.16);color:#fff}
+.chatli span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.chatli .del{opacity:0;background:transparent;border:0;color:var(--mute);cursor:pointer;font-size:14px}.chatli:hover .del{opacity:.6}.chatli .del:hover{opacity:1;color:#ff6b8f}
+.doccard{min-width:280px}
+.doccard button{background:linear-gradient(120deg,var(--a1),var(--a2));border:0;color:#fff;font-weight:700;border-radius:10px;cursor:pointer}
 /* ---------- Juno 2.0 polish ---------- */
 .card{background:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.02));box-shadow:0 1px 0 rgba(255,255,255,.05) inset,0 18px 50px rgba(4,7,14,.45)}
 .kpi{background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.015));transition:transform .2s,border-color .2s}
@@ -268,6 +279,8 @@ h1.h{background:linear-gradient(100deg,#fff,#b9c6e6);-webkit-background-clip:tex
     <section class="view" id="v-chat">
       <div class="chat">
         <div class="chatbar nodrag">
+          <button class="chipbtn" onclick="newChat()">＋ New</button>
+          <button class="chipbtn" onclick="toggleChatList()">🕑 History</button>
           <select id="modeSel" class="modesel" onchange="currentMode=this.value" title="Assistant mode">
             <option value="">✦ Default</option>
             <option value="concise">⚡ Concise</option>
@@ -278,12 +291,13 @@ h1.h{background:linear-gradient(100deg,#fff,#b9c6e6);-webkit-background-clip:tex
             <option value="programmer">💻 Programmer</option>
             <option value="creative">🎨 Creative</option>
           </select>
-          <span class="chatbar-hint">Search the web · analyze files · write · translate · code · remember</span>
+          <span class="chatbar-hint">Search · analyze files · make PDFs · review code</span>
         </div>
+        <div id="chatPanel" class="chatpanel"><div id="chatList"></div></div>
         <div class="thread" id="thread"></div>
         <div id="attachChip" class="attachchip"></div>
         <div class="composer nodrag">
-          <input type="file" id="chatFile" accept="image/*,application/pdf" hidden onchange="onChatFile(this.files[0])">
+          <input type="file" id="chatFile" accept="image/*,application/pdf,.txt,.md,.js,.ts,.jsx,.tsx,.py,.json,.html,.css,.java,.c,.cpp,.go,.rs,.rb,.php,.sh,.swift,.kt,.sql,.yml,.yaml" hidden onchange="onChatFile(this.files[0])">
           <button class="mic" onclick="document.getElementById('chatFile').click()" title="Attach a PDF or image">📎</button>
           <input id="chatInput" placeholder="Message Juno…" onkeydown="if(event.key==='Enter')sendChat()">
           <button class="mic" id="micBtn2" onclick="toggleMic()" title="Talk to Juno">🎙️</button>
@@ -435,8 +449,7 @@ function enterApp(){
   $('#login').classList.add('hidden');$('#appwrap').classList.remove('hidden');setTimeout(()=>movePill(0),60);
   refresh().then(async()=>{
     if(window._googleAT){try{const d=await api('/api/connect/google-token',{method:'POST',body:JSON.stringify({accessToken:window._googleAT})});STATE.user=d.user;render();toast('Google Calendar connected ✓');}catch{}window._googleAT=null;}
-    const c=STATE.user.connections||{};
-    pushMsg('assistant',`Hey 👋 I'm Juno, online and ready. Tell me what to schedule, remember, email, or post and I'll handle it.${c.gmail||c.google?'':' Tip: connect Gmail or Google on the Integrations page so I can manage your real calendar and inbox.'}`);
+    initChats();
   });
 }
 
@@ -503,17 +516,44 @@ async function sendChat(){
   if(!text&&!pendingAttach)return;
   inp.value='';
   const att=pendingAttach;pendingAttach=null;updateAttachChip();
-  pushMsg('user',(att?'📎 '+att.name+(text?'  ·  ':''):'')+text);
-  HIST.push({role:'user',content:text||('Please analyze the attached file ('+(att?att.name:'')+').')});
+  let content=text,fileAttach=null,label=text;
+  if(att){
+    if(att.kind==='text'){content=(text||('Review this file ('+att.name+') and tell me exactly what to change:'))+'\n\n=== '+att.name+' ===\n'+att.text;label='📎 '+att.name+(text?'  ·  '+text:'');}
+    else{fileAttach={kind:att.kind,data:att.data,mediaType:att.mediaType};content=text||('Please analyze the attached file ('+att.name+').');label='📎 '+att.name+(text?'  ·  '+text:'');}
+  }
+  pushMsg('user',label||content);
+  HIST.push({role:'user',content});
   setThinking(true);
   try{
     const body={history:HIST,mode:currentMode};
-    if(att)body.attachment={kind:att.kind,data:att.data,mediaType:att.mediaType};
+    if(fileAttach)body.attachment=fileAttach;
     const r=await api('/api/chat',{method:'POST',body:JSON.stringify(body)});
     setThinking(false);const t=clean(r.text);pushMsg('assistant',t);HIST.push({role:'assistant',content:r.text});
-    if(r.user)STATE.user=r.user;if(r.tasks)STATE.tasks=r.tasks;if(r.events)STATE.events=r.events;if(r.activity)STATE.activity=r.activity;if(r.memories)STATE.memories=r.memories;render();syncApple();speak(t);
+    if(r.document)addDocCard(r.document);
+    if(r.user)STATE.user=r.user;if(r.tasks)STATE.tasks=r.tasks;if(r.events)STATE.events=r.events;if(r.activity)STATE.activity=r.activity;if(r.memories)STATE.memories=r.memories;
+    render();syncApple();speak(t);saveChat();renderChatList();
   }catch(e){setThinking(false);pushMsg('assistant','⚠️ '+e.message);}}
-function onChatFile(f){if(!f)return;if(f.size>12*1024*1024){toast('File too big — keep it under 12MB.');return;}const r=new FileReader();r.onload=()=>{const b64=r.result.split(',')[1];pendingAttach={kind:f.type==='application/pdf'?'pdf':'image',data:b64,mediaType:f.type||'image/jpeg',name:f.name};updateAttachChip();$('#chatInput').focus();};r.readAsDataURL(f);}
+function onChatFile(f){if(!f)return;if(f.size>12*1024*1024){toast('File too big — keep it under 12MB.');return;}const isImg=(f.type||'').startsWith('image/'),isPdf=f.type==='application/pdf';const r=new FileReader();if(isImg||isPdf){r.onload=()=>{pendingAttach={kind:isPdf?'pdf':'image',data:r.result.split(',')[1],mediaType:f.type||'image/jpeg',name:f.name};updateAttachChip();$('#chatInput').focus();};r.readAsDataURL(f);}else{r.onload=()=>{pendingAttach={kind:'text',text:String(r.result).slice(0,80000),name:f.name};updateAttachChip();$('#chatInput').focus();};r.readAsText(f);}}
+/* ---- PDF generation ---- */
+let DOCS=[];
+function ensureHtml2pdf(){if(window.html2pdf)return Promise.resolve();return new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.2/dist/html2pdf.bundle.min.js';s.onload=()=>res();s.onerror=()=>rej(new Error('engine failed'));document.head.appendChild(s);});}
+function addDocCard(doc){const i=DOCS.push(doc)-1;const t=$('#thread');const row=document.createElement('div');row.className='mrow a';const av=document.createElement('div');av.className='mav';row.appendChild(av);const card=document.createElement('div');card.className='msg a doccard';card.innerHTML=`<div style="display:flex;align-items:center;gap:11px"><span style="font-size:24px">📄</span><div style="flex:1;min-width:0"><div style="font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(doc.filename)}</div><div style="font-size:12px;color:var(--mute)">PDF ready</div></div><button style="padding:9px 15px" onclick="downloadPdf(${i})">Download</button></div>`;row.appendChild(card);t.appendChild(row);t.scrollTop=1e9;}
+async function downloadPdf(i){const doc=DOCS[i];if(!doc)return;toast('Building PDF…');try{await ensureHtml2pdf();}catch(e){toast('PDF engine offline — try again');return;}const wrap=document.createElement('div');wrap.style.cssText='position:fixed;left:-99999px;top:0;width:794px;background:#fff;color:#1a1a1a;padding:46px 52px;font-family:-apple-system,Helvetica,Arial,sans-serif;font-size:13px;line-height:1.5;box-sizing:border-box';wrap.innerHTML=doc.html;document.body.appendChild(wrap);const name=doc.filename.toLowerCase().endsWith('.pdf')?doc.filename:doc.filename+'.pdf';try{await window.html2pdf().set({margin:0,filename:name,image:{type:'jpeg',quality:.98},html2canvas:{scale:2,useCORS:true},jsPDF:{unit:'pt',format:'a4',orientation:'portrait'}}).from(wrap).save();toast('PDF downloaded');}catch(e){toast('PDF error: '+(e.message||e));}finally{wrap.remove();}}
+/* ---- multiple chats ---- */
+let CHATS=[],curChatId=null;
+function loadChats(){try{CHATS=JSON.parse(localStorage.getItem('juno_chats')||'[]');}catch{CHATS=[];}curChatId=localStorage.getItem('juno_chat_cur')||null;}
+function persistChats(){try{localStorage.setItem('juno_chats',JSON.stringify(CHATS.slice(0,60)));if(curChatId)localStorage.setItem('juno_chat_cur',curChatId);}catch{}}
+function curChat(){return CHATS.find(c=>c.id===curChatId);}
+function initChats(){loadChats();let c=curChat();if(!c){if(CHATS.length){curChatId=CHATS[0].id;c=curChat();}else{c={id:'c'+Date.now().toString(36),title:'New chat',msgs:[],ts:Date.now()};CHATS.unshift(c);curChatId=c.id;}}HIST=(c.msgs||[]).slice();persistChats();renderThread();renderChatList();}
+function newChat(){saveChat();const c={id:'c'+Date.now().toString(36),title:'New chat',msgs:[],ts:Date.now()};CHATS.unshift(c);curChatId=c.id;HIST=[];DOCS=[];persistChats();renderThread();renderChatList();closeChatList();setTimeout(()=>$('#chatInput')&&$('#chatInput').focus(),50);}
+function saveChat(){const c=curChat();if(!c)return;c.msgs=HIST.slice();const fu=HIST.find(m=>m.role==='user');c.title=fu?String(typeof fu.content==='string'?fu.content:'Chat').replace(/[#*`]/g,'').slice(0,42):'New chat';c.ts=Date.now();persistChats();}
+function loadChat(id){saveChat();curChatId=id;const c=curChat();HIST=(c&&c.msgs)?c.msgs.slice():[];DOCS=[];persistChats();renderThread();renderChatList();closeChatList();go('chat');}
+function delChat(id,ev){if(ev)ev.stopPropagation();CHATS=CHATS.filter(c=>c.id!==id);if(curChatId===id){curChatId=CHATS[0]?CHATS[0].id:null;if(!curChatId)return newChat();HIST=curChat().msgs.slice();renderThread();}persistChats();renderChatList();}
+function renderThread(){const t=$('#thread');if(!t)return;t.innerHTML='';const c=curChat();if(!c||!c.msgs.length){pushMsg('assistant',"Hey 👋 I'm Juno — your assistant. Ask me to schedule things, search the web, analyze a file, make a PDF, review code, or just chat.");return;}for(const m of c.msgs)pushMsg(m.role,typeof m.content==='string'?m.content:'📎 (attachment)');}
+function renderChatList(){const el=$('#chatList');if(!el)return;el.innerHTML=CHATS.length?CHATS.map(c=>`<div class="chatli ${c.id===curChatId?'on':''}" onclick="loadChat('${c.id}')"><span>${esc(c.title||'New chat')}</span><button class="del" onclick="delChat('${c.id}',event)">✕</button></div>`).join(''):`<div class="empty" style="padding:12px">No chats yet</div>`;}
+function toggleChatList(){const p=$('#chatPanel');if(!p)return;p.classList.toggle('on');if(p.classList.contains('on'))renderChatList();}
+function closeChatList(){const p=$('#chatPanel');if(p)p.classList.remove('on');}
+addEventListener('click',e=>{const p=$('#chatPanel');if(p&&p.classList.contains('on')&&!p.contains(e.target)&&!(e.target.closest&&e.target.closest('.chipbtn')))closeChatList();});
 function updateAttachChip(){const c=$('#attachChip');if(!c)return;if(pendingAttach){c.style.display='flex';c.innerHTML=`📎 ${esc(pendingAttach.name)}<span onclick="pendingAttach=null;updateAttachChip()" style="cursor:pointer;color:var(--mute);margin-left:10px;font-weight:700">✕</span>`;}else{c.style.display='none';c.innerHTML='';}}
 function renderMem(){const el=$('#memList');if(!el)return;const m=STATE.memories||[];el.innerHTML=m.length?m.map(x=>`<div class="memit"><span>🧠 ${esc(x.text)}</span><button class="del" style="opacity:.6" onclick="delMem('${x.id}')">✕</button></div>`).join(''):`<div class="empty" style="text-align:left;padding:8px 0">Nothing yet — Juno will remember things as you chat.</div>`;}
 async function addMem(){const i=$('#memInput');const v=i.value.trim();if(!v)return;i.value='';try{const d=await api('/api/memory/add',{method:'POST',body:JSON.stringify({fact:v})});STATE.memories=d.memories;renderMem();toast('Saved to memory');}catch(e){toast('⚠️ '+e.message);}}
