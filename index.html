@@ -583,14 +583,31 @@ async function sendChat(){
   HIST.push({role:'user',content});
   setThinking(true);
   try{
-    const body={history:HIST,mode:currentMode};
+    const body={history:HIST,mode:currentMode,device:!!(window.juno&&window.juno.device)};
     if(fileAttach)body.attachment=fileAttach;
-    const r=await api('/api/chat',{method:'POST',body:JSON.stringify(body)});
-    setThinking(false);const t=clean(r.text);pushMsg('assistant',t);HIST.push({role:'assistant',content:r.text});
+    let r=await api('/api/chat',{method:'POST',body:JSON.stringify(body)});
+    r=await runDeviceActions(r);
+    setThinking(false);const t=clean(r.text||'Done.');pushMsg('assistant',t);HIST.push({role:'assistant',content:r.text||'Done.'});
     if(r.document)addDocCard(r.document);
     if(r.user)STATE.user=r.user;if(r.tasks)STATE.tasks=r.tasks;if(r.events)STATE.events=r.events;if(r.activity)STATE.activity=r.activity;if(r.memories)STATE.memories=r.memories;
     render();syncApple();speak(t);saveChat();renderChatList();
   }catch(e){setThinking(false);pushMsg('assistant','⚠️ '+e.message);}}
+// Execute Mac actions Juno requested (desktop app), then resume the conversation with the results.
+async function runDeviceActions(r){
+  let guard=0;
+  while(r&&r.clientActions&&guard++<8){
+    const results=[...(r.serverResults||[])];
+    for(const a of r.clientActions){
+      let content;
+      try{content=await window.juno.device(a.name,a.input);}catch(e){content='Error: '+e.message;}
+      if(typeof content!=='string'&&!Array.isArray(content))content=String(content);
+      results.push({type:'tool_result',tool_use_id:a.id,content});
+      toast('🖥️ '+a.name.replace(/_/g,' '));
+    }
+    r=await api('/api/chat/resume',{method:'POST',body:JSON.stringify({messages:r.messages,results,mode:currentMode})});
+  }
+  return r;
+}
 function onChatFile(f){if(!f)return;if(f.size>12*1024*1024){toast('File too big — keep it under 12MB.');return;}const isImg=(f.type||'').startsWith('image/'),isPdf=f.type==='application/pdf';const r=new FileReader();if(isImg||isPdf){r.onload=()=>{pendingAttach={kind:isPdf?'pdf':'image',data:r.result.split(',')[1],mediaType:f.type||'image/jpeg',name:f.name};updateAttachChip();$('#chatInput').focus();};r.readAsDataURL(f);}else{r.onload=()=>{pendingAttach={kind:'text',text:String(r.result).slice(0,80000),name:f.name};updateAttachChip();$('#chatInput').focus();};r.readAsText(f);}}
 // Handle one or many dropped/selected files (Swift/Xcode/code files concatenate; an image/PDF attaches on its own)
 async function handleFiles(files){
@@ -650,6 +667,7 @@ const SKILLS=[
  {cat:'Creative',items:[['🎨 Brand kit','Generate a brand name, tagline, and color palette ideas for my idea.'],['🏷️ Name ideas','Brainstorm 20 strong name ideas. Ask me what for.'],['🎬 Content ideas','Give me 10 viral content ideas. Ask me my niche.'],['📝 Write','Write something for me — ask me what and the tone.']]},
  {cat:'Life',items:[['💪 Workout plan','Build me a weekly workout plan. Ask my goals and level.'],['🥗 Meal plan','Make me a healthy 7-day meal plan with a grocery list.'],['💰 Budget','Help me build a monthly budget. Ask my income and expenses.'],['🧘 Calm me','Give me a quick 2-minute calming exercise.']]},
  {cat:'Tools',items:[['🌐 Summarize a page','Read and summarize this URL: '],['🔎 Deep research','Do deep research on a topic and summarize with sources. Ask me the topic.'],['🌍 Translate','Translate text for me. Ask the language.'],['💻 Review code','I will paste code — review it and tell me exactly what to change.']]},
+ {cat:'My Mac',items:[['🖥️ See my screen','Take a screenshot and tell me what is on my screen.'],['🎵 Play music','Open the Music app and start playing.'],['🧹 Clean Downloads','List what is in my Downloads folder and help me clean it up.'],['📋 Fix my clipboard','Read my clipboard, improve the writing, and copy it back.'],['🌙 Dark mode','Toggle dark mode on my Mac.']]},
 ];
 function openSkills(){const html='<h3>✨ Skills</h3><p>One tap and Juno gets to work.</p>'+SKILLS.map(s=>`<div style="margin-top:13px"><div class="secttl" style="margin-bottom:7px">${s.cat}</div><div class="chips" style="justify-content:flex-start">${s.items.map(it=>`<div class="chip" onclick='seedSkill(${JSON.stringify(it[1])})'>${it[0]}</div>`).join('')}</div></div>`).join('');openModal('<div style="max-height:72vh;overflow:auto">'+html+'</div>');}
 function seedSkill(p){closeModal();go('chat');$('#chatInput').value=p;if(/[: ]$/.test(p)||p.trim().endsWith(':')){$('#chatInput').focus();}else{sendChat();}}
