@@ -177,6 +177,17 @@ h1.h{font-size:26px;font-weight:820;letter-spacing:-.02em}.subt{color:var(--mute
 .chatli span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
 .chatli .del{opacity:0;background:transparent;border:0;color:var(--mute);cursor:pointer;font-size:14px}.chatli:hover .del{opacity:.6}.chatli .del:hover{opacity:1;color:#ff6b8f}
 .doccard{min-width:280px}
+.agent{background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.018));border:1px solid var(--line);border-radius:15px;padding:16px;margin-bottom:11px;transition:.18s;max-width:640px}
+.agent:hover{border-color:rgba(255,255,255,.16)}
+.agent.off{opacity:.6}
+.agtop{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.agname{font-weight:750;font-size:15px}
+.agmeta{font-size:12px;color:var(--mute);margin-top:3px}
+.agbtns{display:flex;align-items:center;gap:7px;flex-shrink:0}
+.aginstr{font-size:13px;color:var(--mute);margin-top:9px;line-height:1.5}
+.aglast{font-size:12.5px;color:#7fd8b4;margin-top:9px;background:rgba(55,230,164,.08);border:1px solid rgba(55,230,164,.18);border-radius:9px;padding:8px 11px}
+#v-chat.drag{outline:2px dashed var(--a1);outline-offset:-12px;border-radius:18px}
+#v-chat.drag:before{content:"📂 Drop your files to attach";position:absolute;z-index:30;top:50%;left:50%;transform:translate(-50%,-50%);background:#0d111d;border:1px solid var(--line);padding:15px 24px;border-radius:14px;color:var(--ink);font-weight:700;pointer-events:none;box-shadow:0 18px 50px rgba(0,0,0,.5)}
 .doccard button{background:linear-gradient(120deg,var(--a1),var(--a2));border:0;color:#fff;font-weight:700;border-radius:10px;cursor:pointer}
 /* ---------- Juno 2.0 polish ---------- */
 .card{background:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.02));box-shadow:0 1px 0 rgba(255,255,255,.05) inset,0 18px 50px rgba(4,7,14,.45)}
@@ -233,6 +244,7 @@ h1.h{background:linear-gradient(100deg,#fff,#b9c6e6);-webkit-background-clip:tex
       <div class="nav" data-v="tasks"><span class="ic"><svg viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2"/></svg></span>Tasks</div>
       <div class="nav" data-v="calendar"><span class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg></span>Calendar</div>
       <div class="nav" data-v="integrations"><span class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></span>Integrations</div>
+      <div class="nav" data-v="agents"><span class="ic"><svg viewBox="0 0 24 24"><rect x="5" y="8" width="14" height="11" rx="3"/><path d="M9 8V4.5M15 8V4.5M12 4.5h.01M9.5 13h.01M14.5 13h.01M9.5 16h5M3 11.5v3M21 11.5v3"/></svg></span>Agents</div>
       <div class="nav" data-v="settings"><span class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>Settings</div>
     </nav>
     <div class="foot">
@@ -262,6 +274,7 @@ h1.h{background:linear-gradient(100deg,#fff,#b9c6e6);-webkit-background-clip:tex
           <div class="chip" onclick="seed('Search the web for the latest AI news today')">🔎 Search the web</div>
           <div class="chip" onclick="seed('Draft a professional email to my landlord about renewing my lease')">✍️ Draft an email</div>
           <div class="chip" onclick="seed('Translate \\'good morning, hope you have a great day\\' into Japanese, Spanish and French')">🌍 Translate</div>
+          <div class="chip" onclick="seed('Check my email and plan for any meeting invites or work items')">📧 Plan my email</div>
           <div class="chip" onclick="seed(\"What's on my plate today?\")">🗓️ Brief me</div>
         </div>
       </div>
@@ -297,7 +310,7 @@ h1.h{background:linear-gradient(100deg,#fff,#b9c6e6);-webkit-background-clip:tex
         <div class="thread" id="thread"></div>
         <div id="attachChip" class="attachchip"></div>
         <div class="composer nodrag">
-          <input type="file" id="chatFile" accept="image/*,application/pdf,.txt,.md,.js,.ts,.jsx,.tsx,.py,.json,.html,.css,.java,.c,.cpp,.go,.rs,.rb,.php,.sh,.swift,.kt,.sql,.yml,.yaml" hidden onchange="onChatFile(this.files[0])">
+          <input type="file" id="chatFile" multiple accept="image/*,application/pdf,.txt,.md,.js,.ts,.jsx,.tsx,.py,.json,.html,.css,.java,.c,.cpp,.go,.rs,.rb,.php,.sh,.swift,.h,.m,.mm,.storyboard,.xib,.plist,.pbxproj,.entitlements,.xcconfig,.metal,.kt,.sql,.yml,.yaml" hidden onchange="handleFiles(this.files)">
           <button class="mic" onclick="document.getElementById('chatFile').click()" title="Attach a PDF or image">📎</button>
           <input id="chatInput" placeholder="Message Juno…" onkeydown="if(event.key==='Enter')sendChat()">
           <button class="mic" id="micBtn2" onclick="toggleMic()" title="Talk to Juno">🎙️</button>
@@ -323,6 +336,27 @@ h1.h{background:linear-gradient(100deg,#fff,#b9c6e6);-webkit-background-clip:tex
     <section class="view" id="v-integrations">
       <h1 class="h">Integrations</h1><div class="subt">Connect Juno to your own accounts. Each stays private to you.</div>
       <div class="intg" id="intg"></div>
+    </section>
+
+    <section class="view" id="v-agents">
+      <h1 class="h">Agents</h1><div class="subt">Build autonomous workers that run on their own schedule — 24/7, even when the app is closed.</div>
+      <div class="card glow" style="margin-top:18px;max-width:640px">
+        <div class="secttl">🤖 New agent</div>
+        <div class="field"><input id="agName" placeholder="Name (e.g. Morning Planner)"></div>
+        <div class="field"><textarea id="agInstr" rows="3" placeholder="What should it do every run? e.g. 'Check my email and plan my day. Schedule any meeting invites and add work items as tasks. Then give me a quick brief.'"></textarea></div>
+        <div class="field" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <select id="agFreq" class="modesel">
+            <option value="daily">Once a day</option>
+            <option value="q6h">Every 6 hours</option>
+            <option value="hourly">Every hour</option>
+            <option value="q15">Every 15 minutes</option>
+          </select>
+          <span id="agHourWrap" style="font-size:13px;color:var(--mute)">at <select id="agHour" class="modesel"></select></span>
+          <button class="btn" style="flex:0" onclick="createAgent()">Deploy agent</button>
+        </div>
+      </div>
+      <div class="secttl" style="margin-top:24px">Your agents</div>
+      <div id="agList"></div>
     </section>
 
     <section class="view" id="v-settings">
@@ -454,9 +488,9 @@ function enterApp(){
 }
 
 /* nav */
-const order=['today','chat','tasks','calendar','integrations','settings'];
+const order=['today','chat','tasks','calendar','integrations','agents','settings'];
 function movePill(i){const p=$('#pill');p.style.transform=`translateY(${i*43}px)`;}
-function go(v){order.forEach(o=>$('#v-'+o).classList.toggle('on',o===v));$$('.nav').forEach(n=>n.classList.toggle('on',n.dataset.v===v));movePill(order.indexOf(v));if(v==='chat')setTimeout(()=>$('#chatInput').focus(),60);if(v==='integrations')loadIntegrations();if(v==='settings')renderMem();if(['today','calendar','tasks'].includes(v))refresh();}
+function go(v){order.forEach(o=>$('#v-'+o).classList.toggle('on',o===v));$$('.nav').forEach(n=>n.classList.toggle('on',n.dataset.v===v));movePill(order.indexOf(v));if(v==='chat')setTimeout(()=>$('#chatInput').focus(),60);if(v==='integrations')loadIntegrations();if(v==='settings')renderMem();if(v==='agents')loadAgents();if(['today','calendar','tasks'].includes(v))refresh();}
 $$('.nav').forEach(n=>n.onclick=()=>go(n.dataset.v));
 (function(){const h=new Date().getHours();$('#greet').innerHTML=`Good <span class="g">${h<12?'morning':h<18?'afternoon':'evening'}</span>.`;})();
 
@@ -534,6 +568,17 @@ async function sendChat(){
     render();syncApple();speak(t);saveChat();renderChatList();
   }catch(e){setThinking(false);pushMsg('assistant','⚠️ '+e.message);}}
 function onChatFile(f){if(!f)return;if(f.size>12*1024*1024){toast('File too big — keep it under 12MB.');return;}const isImg=(f.type||'').startsWith('image/'),isPdf=f.type==='application/pdf';const r=new FileReader();if(isImg||isPdf){r.onload=()=>{pendingAttach={kind:isPdf?'pdf':'image',data:r.result.split(',')[1],mediaType:f.type||'image/jpeg',name:f.name};updateAttachChip();$('#chatInput').focus();};r.readAsDataURL(f);}else{r.onload=()=>{pendingAttach={kind:'text',text:String(r.result).slice(0,80000),name:f.name};updateAttachChip();$('#chatInput').focus();};r.readAsText(f);}}
+// Handle one or many dropped/selected files (Swift/Xcode/code files concatenate; an image/PDF attaches on its own)
+async function handleFiles(files){
+  files=[...files].filter(Boolean);if(!files.length)return;
+  const media=files.find(f=>(f.type||'').startsWith('image/')||f.type==='application/pdf');
+  if(media){onChatFile(media);if(files.length>1)toast('Attached '+media.name+' (drop code files separately for review)');return;}
+  let combined='',names=[];
+  for(const f of files.slice(0,20)){if(f.size>5*1024*1024)continue;let txt='';try{txt=await f.text();}catch{}if(txt){combined+='\n\n=== '+f.name+' ===\n'+txt.slice(0,40000);names.push(f.name);}}
+  if(!combined){toast('Could not read those files as text.');return;}
+  pendingAttach={kind:'text',text:combined.slice(0,170000),name:names.length>1?names.length+' files':names[0]};
+  updateAttachChip();$('#chatInput').focus();
+}
 /* ---- PDF generation ---- */
 let DOCS=[];
 function ensureHtml2pdf(){if(window.html2pdf)return Promise.resolve();return new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.2/dist/html2pdf.bundle.min.js';s.onload=()=>res();s.onerror=()=>rej(new Error('engine failed'));document.head.appendChild(s);});}
@@ -554,10 +599,26 @@ function renderChatList(){const el=$('#chatList');if(!el)return;el.innerHTML=CHA
 function toggleChatList(){const p=$('#chatPanel');if(!p)return;p.classList.toggle('on');if(p.classList.contains('on'))renderChatList();}
 function closeChatList(){const p=$('#chatPanel');if(p)p.classList.remove('on');}
 addEventListener('click',e=>{const p=$('#chatPanel');if(p&&p.classList.contains('on')&&!p.contains(e.target)&&!(e.target.closest&&e.target.closest('.chipbtn')))closeChatList();});
+// drag & drop files onto the chat (Swift/Xcode/code files, PDFs, images)
+(function(){const z=$('#v-chat');if(!z)return;let dc=0;
+  z.addEventListener('dragenter',e=>{e.preventDefault();dc++;z.classList.add('drag');});
+  z.addEventListener('dragover',e=>{e.preventDefault();});
+  z.addEventListener('dragleave',e=>{dc--;if(dc<=0){dc=0;z.classList.remove('drag');}});
+  z.addEventListener('drop',e=>{e.preventDefault();dc=0;z.classList.remove('drag');if(e.dataTransfer&&e.dataTransfer.files.length){go('chat');handleFiles(e.dataTransfer.files);}});
+})();
 function updateAttachChip(){const c=$('#attachChip');if(!c)return;if(pendingAttach){c.style.display='flex';c.innerHTML=`📎 ${esc(pendingAttach.name)}<span onclick="pendingAttach=null;updateAttachChip()" style="cursor:pointer;color:var(--mute);margin-left:10px;font-weight:700">✕</span>`;}else{c.style.display='none';c.innerHTML='';}}
 function renderMem(){const el=$('#memList');if(!el)return;const m=STATE.memories||[];el.innerHTML=m.length?m.map(x=>`<div class="memit"><span>🧠 ${esc(x.text)}</span><button class="del" style="opacity:.6" onclick="delMem('${x.id}')">✕</button></div>`).join(''):`<div class="empty" style="text-align:left;padding:8px 0">Nothing yet — Juno will remember things as you chat.</div>`;}
 async function addMem(){const i=$('#memInput');const v=i.value.trim();if(!v)return;i.value='';try{const d=await api('/api/memory/add',{method:'POST',body:JSON.stringify({fact:v})});STATE.memories=d.memories;renderMem();toast('Saved to memory');}catch(e){toast('⚠️ '+e.message);}}
 async function delMem(id){try{const d=await api('/api/memory/delete',{method:'POST',body:JSON.stringify({id})});STATE.memories=d.memories;renderMem();}catch(e){toast('⚠️ '+e.message);}}
+/* ---- autonomous agents ---- */
+let AGENTS=[],FREQLAB={daily:'once a day',q6h:'every 6 hours',hourly:'every hour',q15:'every 15 min'};
+(function(){const h=$('#agHour');if(h)for(let i=0;i<24;i++){const o=document.createElement('option');o.value=i;o.textContent=((i%12)||12)+(i<12?'am':'pm');h.appendChild(o);}if(h)h.value=8;})();
+async function loadAgents(){try{const d=await api('/api/agents');AGENTS=d.agents||[];if(d.freqLabels)FREQLAB=d.freqLabels;}catch{}renderAgents();}
+function renderAgents(){const el=$('#agList');if(!el)return;el.innerHTML=AGENTS.length?AGENTS.map(a=>`<div class="agent ${a.enabled?'':'off'}"><div class="agtop"><div><div class="agname">🤖 ${esc(a.name)}</div><div class="agmeta">${esc(FREQLAB[a.freq]||a.freq)}${a.freq==='daily'?' at '+(((a.hour||8)%12)||12)+((a.hour||8)<12?'am':'pm'):''} · ${a.enabled?'<span style=\"color:var(--good)\">● active</span>':'paused'}</div></div><div class="agbtns"><button class="cbtn" style="width:auto;padding:7px 12px" onclick="runAgentNow('${a.id}')">Run now</button><button class="cbtn" style="width:auto;padding:7px 12px" onclick="toggleAgent('${a.id}')">${a.enabled?'Pause':'Resume'}</button><button class="del" style="opacity:.6" onclick="delAgent('${a.id}')">✕</button></div></div><div class="aginstr">${esc(a.instruction)}</div>${a.lastResult?`<div class="aglast">Last run: ${esc(a.lastResult)}</div>`:''}</div>`).join(''):`<div class="empty" style="text-align:left">No agents yet. Create one above — it'll work for you on a schedule.</div>`;}
+async function createAgent(){const name=$('#agName').value.trim(),instruction=$('#agInstr').value.trim(),freq=$('#agFreq').value,hour=$('#agHour').value;if(!instruction)return toast('Tell the agent what to do');try{const d=await api('/api/agents/create',{method:'POST',body:JSON.stringify({name,instruction,freq,hour:Number(hour)})});AGENTS=d.agents;$('#agName').value='';$('#agInstr').value='';renderAgents();toast('Agent deployed 🤖');}catch(e){toast('⚠️ '+e.message);}}
+async function toggleAgent(id){try{const d=await api('/api/agents/toggle',{method:'POST',body:JSON.stringify({id})});AGENTS=d.agents;renderAgents();}catch(e){toast('⚠️ '+e.message);}}
+async function delAgent(id){try{const d=await api('/api/agents/delete',{method:'POST',body:JSON.stringify({id})});AGENTS=d.agents;renderAgents();}catch(e){toast('⚠️ '+e.message);}}
+async function runAgentNow(id){toast('Running agent…');try{const d=await api('/api/agents/run',{method:'POST',body:JSON.stringify({id})});AGENTS=d.agents;if(d.events)STATE.events=d.events;if(d.tasks)STATE.tasks=d.tasks;if(d.activity)STATE.activity=d.activity;renderAgents();render();syncApple();const a=AGENTS.find(x=>x.id===id);toast(a&&a.lastResult?'✓ '+a.lastResult.slice(0,60):'Agent ran');}catch(e){toast('⚠️ '+e.message);}}
 function seed(t){go('chat');$('#chatInput').value=t;sendChat();}
 function quickAsk(){const v=$('#askInput').value.trim();if(!v)return;$('#askInput').value='';seed(v);}
 
