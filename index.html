@@ -445,13 +445,15 @@ async function addTaskUI(){const i=$('#taskInput');const v=i.value.trim();if(!v)
 async function toggleTask(id){const d=await api('/api/task/toggle',{method:'POST',body:JSON.stringify({id})});STATE.tasks=d.tasks;render();}
 async function delEvent(id){
   const ev=(STATE.events||[]).find(e=>e.id===id);
-  try{
-    const d=await api('/api/event/delete',{method:'POST',body:JSON.stringify({id})});
-    STATE.events=d.events;
-    try{let done=JSON.parse(localStorage.getItem('juno_applesync')||'[]');done=done.filter(x=>x!==id);localStorage.setItem('juno_applesync',JSON.stringify(done));}catch{}
-    if(ev&&window.juno&&window.juno.appleCalDel){window.juno.appleCalDel({title:ev.title,start:ev.start}).catch(()=>{});}
-    render();toast('Event removed');
-  }catch(e){toast('⚠️ '+e.message);}
+  // remove from the view immediately so it always feels instant
+  STATE.events=(STATE.events||[]).filter(e=>e.id!==id);render();toast('Event removed');
+  try{let done=JSON.parse(localStorage.getItem('juno_applesync')||'[]');done=done.filter(x=>x!==id);localStorage.setItem('juno_applesync',JSON.stringify(done));}catch{}
+  if(ev&&window.juno&&window.juno.appleCalDel){window.juno.appleCalDel({title:ev.title,start:ev.start}).catch(()=>{});}
+  // sync to server with a retry in case of a momentary blip
+  for(let i=0;i<3;i++){
+    try{ const d=await api('/api/event/delete',{method:'POST',body:JSON.stringify({id})}); STATE.events=d.events; render(); return; }
+    catch(e){ if(i<2) await new Promise(r=>setTimeout(r,700)); }
+  }
 }
 
 /* ---------- VOICE ---------- */
