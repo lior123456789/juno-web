@@ -182,6 +182,10 @@ h1.h{font-size:26px;font-weight:820;letter-spacing:-.02em}.subt{color:var(--mute
 .field input,.field textarea{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:12px 14px;color:var(--ink);font-size:14px;font-family:inherit;outline:none;transition:.15s;resize:vertical}
 .field input:focus,.field textarea:focus{border-color:rgba(109,92,255,.6);box-shadow:0 0 0 4px rgba(109,92,255,.12)}
 .field input::placeholder,.field textarea::placeholder{color:var(--dim)}
+.themerow{display:flex;gap:13px;margin-top:6px;flex-wrap:wrap}
+.swatch{width:36px;height:36px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:.15s}
+.swatch:hover{transform:scale(1.12)}
+.swatch.on{border-color:#fff;box-shadow:0 0 0 3px rgba(255,255,255,.16)}
 .agent{background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.018));border:1px solid var(--line);border-radius:15px;padding:16px;margin-bottom:11px;transition:.18s;max-width:640px}
 .agent:hover{border-color:rgba(255,255,255,.16)}
 .agent.off{opacity:.6}
@@ -299,14 +303,24 @@ h1.h{background:linear-gradient(100deg,#fff,#b9c6e6);-webkit-background-clip:tex
         <div class="chatbar nodrag">
           <button class="chipbtn" onclick="newChat()">＋ New</button>
           <button class="chipbtn" onclick="toggleChatList()">🕑 History</button>
+          <button class="chipbtn" onclick="openSkills()">✨ Skills</button>
           <select id="modeSel" class="modesel" onchange="currentMode=this.value" title="Assistant mode">
             <option value="">✦ Default</option>
-            <option value="concise">⚡ Concise</option>
+            <option value="quick">⚡ Quick answer</option>
+            <option value="concise">📍 Concise</option>
+            <option value="research">🔬 Deep research</option>
+            <option value="stepbystep">🪜 Step-by-step</option>
+            <option value="debate">⚖️ Debate</option>
+            <option value="factcheck">✅ Fact-check</option>
+            <option value="eli5">🧒 Explain simply</option>
             <option value="professional">💼 Professional</option>
             <option value="friendly">😊 Friendly</option>
             <option value="coach">🎯 Coach</option>
             <option value="teacher">📚 Teacher</option>
             <option value="programmer">💻 Programmer</option>
+            <option value="engineer">🛠️ Engineer</option>
+            <option value="doctor">🩺 Doctor</option>
+            <option value="lawyer">📜 Lawyer</option>
             <option value="creative">🎨 Creative</option>
           </select>
           <span class="chatbar-hint">Search · analyze files · make PDFs · review code</span>
@@ -374,6 +388,10 @@ h1.h{background:linear-gradient(100deg,#fff,#b9c6e6);-webkit-background-clip:tex
           <button class="send" onclick="addMem()">Save</button>
         </div>
         <div class="hint" style="margin-top:8px">Juno also remembers things automatically as you chat. These carry across every conversation.</div>
+      </div>
+      <div class="card glow" style="margin-top:16px;max-width:600px">
+        <div class="secttl">🎨 Theme</div>
+        <div class="themerow" id="themeRow"></div>
       </div>
       <div class="card glow" style="margin-top:16px;max-width:600px">
         <div class="secttl">Voice</div>
@@ -459,6 +477,7 @@ let TOKEN=localStorage.getItem('juno_token')||'';   // backend JWT (email/passwo
 let authMode=TOKEN?'backend':null;                   // 'backend' | 'firebase'
 if(!window.juno){window.juno={openExternal:(u)=>window.open(u,'_blank','noopener'),setAutoLaunch:async()=>{},onFocus:(fn)=>window.addEventListener('focus',fn)};}
 setTimeout(()=>{const b=document.getElementById('boot');if(b)b.classList.add('gone');},850);
+try{applyTheme(localStorage.getItem('juno_theme')||'aurora');}catch{}
 
 /* aurora */
 (function(){const c=$('#aurora'),x=c.getContext('2d');let W,H;function size(){W=c.width=innerWidth*devicePixelRatio;H=c.height=innerHeight*devicePixelRatio;}size();addEventListener('resize',size);
@@ -495,7 +514,7 @@ function enterApp(){
 /* nav */
 const order=['today','chat','tasks','calendar','integrations','agents','settings'];
 function movePill(i){const p=$('#pill');p.style.transform=`translateY(${i*43}px)`;}
-function go(v){order.forEach(o=>$('#v-'+o).classList.toggle('on',o===v));$$('.nav').forEach(n=>n.classList.toggle('on',n.dataset.v===v));movePill(order.indexOf(v));if(v==='chat')setTimeout(()=>$('#chatInput').focus(),60);if(v==='integrations')loadIntegrations();if(v==='settings')renderMem();if(v==='agents')loadAgents();if(['today','calendar','tasks'].includes(v))refresh();}
+function go(v){order.forEach(o=>$('#v-'+o).classList.toggle('on',o===v));$$('.nav').forEach(n=>n.classList.toggle('on',n.dataset.v===v));movePill(order.indexOf(v));if(v==='chat')setTimeout(()=>$('#chatInput').focus(),60);if(v==='integrations')loadIntegrations();if(v==='settings'){renderMem();renderThemes();}if(v==='agents')loadAgents();if(['today','calendar','tasks'].includes(v))refresh();}
 $$('.nav').forEach(n=>n.onclick=()=>go(n.dataset.v));
 (function(){const h=new Date().getHours();$('#greet').innerHTML=`Good <span class="g">${h<12?'morning':h<18?'afternoon':'evening'}</span>.`;})();
 
@@ -624,6 +643,20 @@ async function createAgent(){const name=$('#agName').value.trim(),instruction=$(
 async function toggleAgent(id){try{const d=await api('/api/agents/toggle',{method:'POST',body:JSON.stringify({id})});AGENTS=d.agents;renderAgents();}catch(e){toast('⚠️ '+e.message);}}
 async function delAgent(id){try{const d=await api('/api/agents/delete',{method:'POST',body:JSON.stringify({id})});AGENTS=d.agents;renderAgents();}catch(e){toast('⚠️ '+e.message);}}
 async function runAgentNow(id){toast('Running agent…');try{const d=await api('/api/agents/run',{method:'POST',body:JSON.stringify({id})});AGENTS=d.agents;if(d.events)STATE.events=d.events;if(d.tasks)STATE.tasks=d.tasks;if(d.activity)STATE.activity=d.activity;renderAgents();render();syncApple();const a=AGENTS.find(x=>x.id===id);toast(a&&a.lastResult?'✓ '+a.lastResult.slice(0,60):'Agent ran');}catch(e){toast('⚠️ '+e.message);}}
+/* ---- skills launcher ---- */
+const SKILLS=[
+ {cat:'Work',items:[['📄 Resume','Build me a clean professional one-page resume PDF. Ask me for any details you need first.'],['✉️ Cover letter','Write me a cover letter PDF — ask me which job and company.'],['🧾 Invoice','Make me an invoice PDF. Ask for the line items and details.'],['📊 Meeting notes','Turn these meeting notes into clear action items and a summary:'],['📧 Plan my email','Check my email and plan for any meetings or work items.']]},
+ {cat:'Learn',items:[['🧠 Study plan','Make me a study plan. Ask me the subject and timeline.'],['🃏 Flashcards','Make flashcards for a topic I give you.'],['❓ Quiz me','Quiz me to test my knowledge. Ask me the topic.'],['🔬 Explain','Explain a concept simply then in more depth. Ask me what.']]},
+ {cat:'Creative',items:[['🎨 Brand kit','Generate a brand name, tagline, and color palette ideas for my idea.'],['🏷️ Name ideas','Brainstorm 20 strong name ideas. Ask me what for.'],['🎬 Content ideas','Give me 10 viral content ideas. Ask me my niche.'],['📝 Write','Write something for me — ask me what and the tone.']]},
+ {cat:'Life',items:[['💪 Workout plan','Build me a weekly workout plan. Ask my goals and level.'],['🥗 Meal plan','Make me a healthy 7-day meal plan with a grocery list.'],['💰 Budget','Help me build a monthly budget. Ask my income and expenses.'],['🧘 Calm me','Give me a quick 2-minute calming exercise.']]},
+ {cat:'Tools',items:[['🌐 Summarize a page','Read and summarize this URL: '],['🔎 Deep research','Do deep research on a topic and summarize with sources. Ask me the topic.'],['🌍 Translate','Translate text for me. Ask the language.'],['💻 Review code','I will paste code — review it and tell me exactly what to change.']]},
+];
+function openSkills(){const html='<h3>✨ Skills</h3><p>One tap and Juno gets to work.</p>'+SKILLS.map(s=>`<div style="margin-top:13px"><div class="secttl" style="margin-bottom:7px">${s.cat}</div><div class="chips" style="justify-content:flex-start">${s.items.map(it=>`<div class="chip" onclick='seedSkill(${JSON.stringify(it[1])})'>${it[0]}</div>`).join('')}</div></div>`).join('');openModal('<div style="max-height:72vh;overflow:auto">'+html+'</div>');}
+function seedSkill(p){closeModal();go('chat');$('#chatInput').value=p;if(/[: ]$/.test(p)||p.trim().endsWith(':')){$('#chatInput').focus();}else{sendChat();}}
+/* ---- themes ---- */
+const THEMES={aurora:['#6d5cff','#19c3ff','#ff5ca8'],emerald:['#0fae6e','#37e6a4','#19c3ff'],sunset:['#ff7a45','#ffc36b','#ff5ca8'],ocean:['#3b82f6','#22d3ee','#818cf8'],royal:['#a855f7','#6d5cff','#ec4899'],mono:['#8b95b5','#aab3d0','#6b7596']};
+function applyTheme(name){const t=THEMES[name]||THEMES.aurora;const r=document.documentElement;r.style.setProperty('--a1',t[0]);r.style.setProperty('--a2',t[1]);r.style.setProperty('--a3',t[2]);try{localStorage.setItem('juno_theme',name);}catch{}renderThemes();}
+function renderThemes(){const el=$('#themeRow');if(!el)return;const cur=localStorage.getItem('juno_theme')||'aurora';el.innerHTML=Object.keys(THEMES).map(n=>{const t=THEMES[n];return `<div class="swatch ${n===cur?'on':''}" onclick="applyTheme('${n}')" title="${n}" style="background:conic-gradient(from 120deg,${t[0]},${t[1]},${t[2]},${t[0]})"></div>`;}).join('');}
 function seed(t){go('chat');$('#chatInput').value=t;sendChat();}
 function quickAsk(){const v=$('#askInput').value.trim();if(!v)return;$('#askInput').value='';seed(v);}
 
