@@ -433,7 +433,7 @@ let HIST=[];
 function pushMsg(role,content){const t=$('#thread');const d=document.createElement('div');d.className='msg '+(role==='user'?'u':'a');d.textContent=content;t.appendChild(d);t.scrollTop=t.scrollHeight;}
 function setThinking(on){$('#orb').classList.toggle('think',on);let ty=$('#typing');if(on&&!ty){ty=document.createElement('div');ty.className='typing';ty.id='typing';ty.innerHTML='<i></i><i></i><i></i>';$('#thread').appendChild(ty);$('#thread').scrollTop=1e9;}else if(!on&&ty)ty.remove();}
 async function sendChat(){const inp=$('#chatInput');const text=inp.value.trim();if(!text)return;inp.value='';pushMsg('user',text);HIST.push({role:'user',content:text});setThinking(true);
-  try{const r=await api('/api/chat',{method:'POST',body:JSON.stringify({history:HIST})});setThinking(false);const t=clean(r.text);pushMsg('assistant',t);HIST.push({role:'assistant',content:r.text});if(r.user)STATE.user=r.user;if(r.tasks)STATE.tasks=r.tasks;if(r.events)STATE.events=r.events;if(r.activity)STATE.activity=r.activity;render();speak(t);}
+  try{const r=await api('/api/chat',{method:'POST',body:JSON.stringify({history:HIST})});setThinking(false);const t=clean(r.text);pushMsg('assistant',t);HIST.push({role:'assistant',content:r.text});if(r.user)STATE.user=r.user;if(r.tasks)STATE.tasks=r.tasks;if(r.events)STATE.events=r.events;if(r.activity)STATE.activity=r.activity;render();syncApple();speak(t);}
   catch(e){setThinking(false);pushMsg('assistant','⚠️ '+e.message);}}
 function seed(t){go('chat');$('#chatInput').value=t;sendChat();}
 function quickAsk(){const v=$('#askInput').value.trim();if(!v)return;$('#askInput').value='';seed(v);}
@@ -489,7 +489,18 @@ function closeModal(){$('#modal').classList.remove('on');}
 function ext(u){window.juno.openExternal(u);}
 async function toggleAuto(){const on=!$('#autoSw').classList.contains('on');$('#autoSw').classList.toggle('on',on);await window.juno.setAutoLaunch(on);}
 
-async function refresh(){try{const d=await api('/api/me');STATE.user=d.user;STATE.tasks=d.tasks||[];STATE.events=d.events||[];STATE.activity=d.activity||[];render();}catch(e){/* token may be mid-refresh; ignore */}}
+async function refresh(){try{const d=await api('/api/me');STATE.user=d.user;STATE.tasks=d.tasks||[];STATE.events=d.events||[];STATE.activity=d.activity||[];render();syncApple();}catch(e){/* token may be mid-refresh; ignore */}}
+// Push new events to the Mac's Apple Calendar (desktop app only; web browser has no window.juno.appleCal).
+async function syncApple(){
+  if(!window.juno||!window.juno.appleCal)return;
+  let done=[];try{done=JSON.parse(localStorage.getItem('juno_applesync')||'[]');}catch{}
+  const set=new Set(done);let changed=false;
+  for(const ev of (STATE.events||[])){
+    if(set.has(ev.id))continue;
+    try{const r=await window.juno.appleCal({title:ev.title,start:ev.start,end:ev.end,notes:ev.notes});if(r&&r.ok){set.add(ev.id);changed=true;}}catch{}
+  }
+  if(changed)localStorage.setItem('juno_applesync',JSON.stringify([...set]));
+}
 window.juno.onFocus(()=>{if(!$('#appwrap').classList.contains('hidden'))refresh();});
 
 /* boot — Firebase decides who's logged in */
