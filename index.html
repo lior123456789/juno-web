@@ -655,7 +655,7 @@ async function sendChat(){
 // Execute Mac actions Juno requested (desktop app), then resume the conversation with the results.
 async function runDeviceActions(r){
   let guard=0,buildEl=null,files=0,shownPlan=false;
-  while(r&&r.clientActions&&guard++<14){
+  while(r&&r.clientActions&&guard++<26){
     if(r.text&&r.text.trim()&&!shownPlan){shownPlan=true;setThinking(false);pushMsg('assistant',clean(r.text));HIST.push({role:'assistant',content:r.text});setThinking(true);}
     const results=[...(r.serverResults||[])];
     for(const a of r.clientActions){
