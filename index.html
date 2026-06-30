@@ -186,6 +186,14 @@ h1.h{font-size:26px;font-weight:820;letter-spacing:-.02em}.subt{color:var(--mute
 .chatli span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
 .chatli .del{opacity:0;background:transparent;border:0;color:var(--mute);cursor:pointer;font-size:14px}.chatli:hover .del{opacity:.6}.chatli .del:hover{opacity:1;color:#ff6b8f}
 .doccard{min-width:280px}
+.buildcard{min-width:320px}
+.bhead{font-weight:750;font-size:14px;display:flex;justify-content:space-between;gap:10px;align-items:center}
+.bfiles{color:var(--mute);font-weight:600;font-size:12px}
+.bbar{height:7px;border-radius:6px;background:rgba(255,255,255,.09);overflow:hidden;margin:11px 0 8px;position:relative}
+.bbar i{position:absolute;top:0;height:100%;width:42%;border-radius:6px;background:linear-gradient(90deg,var(--a1),var(--a2));animation:bslide 1.1s ease-in-out infinite}
+@keyframes bslide{0%{left:-42%}100%{left:100%}}
+.bbar.done i{animation:none;left:0;width:100%}
+.bcur{font-size:12.5px;color:var(--mute)}
 .field{margin-bottom:11px}
 .field label{font-size:13px;color:var(--mute);font-weight:600;display:block;margin-bottom:7px}
 .field input,.field textarea{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:12px 14px;color:var(--ink);font-size:14px;font-family:inherit;outline:none;transition:.15s;resize:vertical}
@@ -640,20 +648,27 @@ async function sendChat(){
   }catch(e){setThinking(false);pushMsg('assistant','⚠️ '+e.message);}}
 // Execute Mac actions Juno requested (desktop app), then resume the conversation with the results.
 async function runDeviceActions(r){
-  let guard=0;
-  while(r&&r.clientActions&&guard++<8){
+  let guard=0,buildEl=null,files=0,shownPlan=false;
+  while(r&&r.clientActions&&guard++<14){
+    if(r.text&&r.text.trim()&&!shownPlan){shownPlan=true;setThinking(false);pushMsg('assistant',clean(r.text));HIST.push({role:'assistant',content:r.text});setThinking(true);}
     const results=[...(r.serverResults||[])];
     for(const a of r.clientActions){
+      if(a.name==='write_file'){if(!buildEl)buildEl=addBuildCard();files++;updateBuildCard(buildEl,a.input.path,files);}
+      else if(buildEl){updateBuildCard(buildEl,(a.name==='run_shell'?'running a command':a.name==='open_path'?'opening it':a.name.replace(/_/g,' ')),files);}
       let content;
       try{content=await window.juno.device(a.name,a.input);}catch(e){content='Error: '+e.message;}
       if(typeof content!=='string'&&!Array.isArray(content))content=String(content);
       results.push({type:'tool_result',tool_use_id:a.id,content});
-      toast('🖥️ '+a.name.replace(/_/g,' '));
+      if(!buildEl)toast('🖥️ '+a.name.replace(/_/g,' '));
     }
     r=await api('/api/chat/resume',{method:'POST',body:JSON.stringify({messages:r.messages,results,mode:currentMode})});
   }
+  if(buildEl)finishBuildCard(buildEl,files);
   return r;
 }
+function addBuildCard(){const t=$('#thread');const row=document.createElement('div');row.className='mrow a';const av=document.createElement('div');av.className='mav';row.appendChild(av);const c=document.createElement('div');c.className='msg a buildcard';c.innerHTML='<div class="bhead">🔨 Building… <span class="bfiles">0 files</span></div><div class="bbar"><i></i></div><div class="bcur">starting…</div>';row.appendChild(c);t.appendChild(row);t.scrollTop=1e9;return c;}
+function updateBuildCard(el,cur,n){el.querySelector('.bfiles').textContent=n+' file'+(n===1?'':'s');el.querySelector('.bcur').textContent=cur?(/[/.]/.test(cur)?'writing '+String(cur).split('/').pop():cur):'working…';}
+function finishBuildCard(el,n){el.querySelector('.bhead').innerHTML='✅ Built '+n+' file'+(n===1?'':'s');el.querySelector('.bbar').classList.add('done');el.querySelector('.bcur').textContent='Done — opening it for you.';}
 function onChatFile(f){if(!f)return;if(f.size>12*1024*1024){toast('File too big — keep it under 12MB.');return;}const isImg=(f.type||'').startsWith('image/'),isPdf=f.type==='application/pdf';const r=new FileReader();if(isImg||isPdf){r.onload=()=>{pendingAttach={kind:isPdf?'pdf':'image',data:r.result.split(',')[1],mediaType:f.type||'image/jpeg',name:f.name};updateAttachChip();$('#chatInput').focus();};r.readAsDataURL(f);}else{r.onload=()=>{pendingAttach={kind:'text',text:String(r.result).slice(0,80000),name:f.name};updateAttachChip();$('#chatInput').focus();};r.readAsText(f);}}
 // Handle one or many dropped/selected files (Swift/Xcode/code files concatenate; an image/PDF attaches on its own)
 async function handleFiles(files){
